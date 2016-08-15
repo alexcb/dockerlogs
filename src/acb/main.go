@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
+	"reflect"
 	"strings"
 	"time"
 
 	"github.com/docker/engine-api/client"
 	"github.com/docker/engine-api/types"
 	"golang.org/x/net/context"
+
+	"github.com/aybabtme/humanlog"
 )
 
 // curl --unix-socket /var/run/docker.sock 'http:/containers/1a210a4481b7/logs?stderr=1&stdout=1&timestamps=1&follow=1'
@@ -62,7 +66,11 @@ func NewLogTail() *logtail {
 }
 
 func (s *logtail) getLine() *logLine {
+
 	for {
+
+		// grab latest log from each channel (if available)
+		numEmptyChannels := 0
 		for i, _ := range s.containerLogsList {
 			c := &s.containerLogsList[i]
 			if c.line == nil {
@@ -70,8 +78,27 @@ func (s *logtail) getLine() *logLine {
 				case x := <-c.ch:
 					c.line = &x
 				default:
+					numEmptyChannels++
 				}
 			}
+		}
+
+		if numEmptyChannels == len(s.containerLogsList) {
+			cases := make([]reflect.SelectCase, len(s.containerLogsList))
+			for i, _ := range s.containerLogsList {
+				ch := s.containerLogsList[i].ch
+				cases[i] = reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(ch)}
+			}
+
+			// Block
+			chosen, value, ok := reflect.Select(cases)
+
+			if !ok {
+				panic("not ok channel from select")
+			}
+
+			logLine := value.Interface().(logLine)
+			s.containerLogsList[chosen].line = &logLine
 		}
 
 		mini := -1
@@ -98,7 +125,6 @@ func (s *logtail) getLine() *logLine {
 		if line != nil {
 			return line
 		}
-		//time.Sleep(time.Millisecond)
 	}
 }
 
@@ -106,11 +132,33 @@ func main() {
 
 	lt := NewLogTail()
 
-	time.Sleep(5 * time.Millisecond)
+	// Sleep to make sure all files have been read by the corresponding thread
+	time.Sleep(10 * time.Millisecond)
+
+	opts := humanlog.DefaultOptions
+
+	//logrusEntry := LogrusHandler{Opts: opts}
+	jsonEntry := humanlog.JSONHandler{Opts: opts}
+
+	dst := os.Stdout
 
 	for {
 		line := lt.getLine()
-		fmt.Printf("got: %v\n", line)
+		lineData := []byte(line.line)
+
+		switch {
+
+		case jsonEntry.TryHandle(lineData):
+			dst.Write(jsonEntry.Prettify(false))
+
+		//case logrusEntry.CanHandle(line) && logfmt.Parse(lineData, true, true, logrusEntry.visit):
+		//	dst.Write(logrusEntry.Prettify(false))
+
+		default:
+			dst.Write(lineData)
+		}
+		dst.Write([]byte("\n"))
+
 	}
 
 }
