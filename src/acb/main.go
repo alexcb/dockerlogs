@@ -65,41 +65,44 @@ func NewLogTail() *logtail {
 	}
 }
 
-func (s *logtail) getLine() *logLine {
+func (s *logtail) readFromChannels() {
+	// grab latest log from each channel (if available)
+	numEmptyChannels := 0
+	for i, _ := range s.containerLogsList {
+		c := &s.containerLogsList[i]
+		if c.line == nil {
+			select {
+			case x := <-c.ch:
+				c.line = &x
+			default:
+				numEmptyChannels++
+			}
+		}
+	}
 
-	for {
-
-		// grab latest log from each channel (if available)
-		numEmptyChannels := 0
+	// if no logs are available, block until at least one is
+	if numEmptyChannels == len(s.containerLogsList) {
+		cases := make([]reflect.SelectCase, len(s.containerLogsList))
 		for i, _ := range s.containerLogsList {
-			c := &s.containerLogsList[i]
-			if c.line == nil {
-				select {
-				case x := <-c.ch:
-					c.line = &x
-				default:
-					numEmptyChannels++
-				}
-			}
+			ch := s.containerLogsList[i].ch
+			cases[i] = reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(ch)}
 		}
 
-		if numEmptyChannels == len(s.containerLogsList) {
-			cases := make([]reflect.SelectCase, len(s.containerLogsList))
-			for i, _ := range s.containerLogsList {
-				ch := s.containerLogsList[i].ch
-				cases[i] = reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(ch)}
-			}
+		// Block
+		chosen, value, ok := reflect.Select(cases)
 
-			// Block
-			chosen, value, ok := reflect.Select(cases)
-
-			if !ok {
-				panic("not ok channel from select")
-			}
-
-			logLine := value.Interface().(logLine)
-			s.containerLogsList[chosen].line = &logLine
+		if !ok {
+			panic("not ok channel from select")
 		}
+
+		logLine := value.Interface().(logLine)
+		s.containerLogsList[chosen].line = &logLine
+	}
+}
+
+func (s *logtail) getLine() *logLine {
+	for {
+		s.readFromChannels()
 
 		mini := -1
 		for i, _ := range s.containerLogsList {
@@ -115,14 +118,10 @@ func (s *logtail) getLine() *logLine {
 			}
 		}
 
-		var line *logLine
 		if mini >= 0 {
 			c := &s.containerLogsList[mini]
-			line = c.line
+			line := c.line
 			c.line = nil
-		}
-
-		if line != nil {
 			return line
 		}
 	}

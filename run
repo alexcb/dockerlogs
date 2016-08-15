@@ -3,4 +3,7 @@ import sys
 import os
 import subprocess
 path = os.path.dirname(os.path.abspath(__file__))
-subprocess.check_call(['go', 'run', 'src/acb/main.go'], env={'GOPATH': path})
+try:
+    subprocess.check_call(['go', 'run', 'src/acb/main.go'], env={'GOPATH': path})
+except subprocess.CalledProcessError as e:
+    sys.exit(e.returncode)
