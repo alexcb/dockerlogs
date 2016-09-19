@@ -35,9 +35,9 @@ type Log struct {
 func getLevelFromString(s string) LogLevel {
 	s = strings.ToLower(s)
 	switch s {
-	case "CRIT", "CRITICAL", "PANIC":
+	case "crit", "critical", "panic":
 		return CRITICAL
-	case "ERR", "ERROR":
+	case "err", "error":
 		return ERROR
 	case "warn", "warning":
 		return WARNING
