@@ -4,6 +4,7 @@ import (
 	"acb/logparsers/keyvalue"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/aybabtme/rgbterm"
@@ -26,10 +27,22 @@ type KeyValue struct {
 	Value string
 }
 
+type KeyValues []KeyValue
+
+func (s KeyValues) Len() int {
+	return len(s)
+}
+func (s KeyValues) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+func (s KeyValues) Less(i, j int) bool {
+	return s[i].Key < s[j].Key
+}
+
 type Log struct {
 	Level   LogLevel
 	Msg     string
-	Context []KeyValue
+	Context KeyValues
 }
 
 func getLevelFromString(s string) LogLevel {
@@ -151,6 +164,7 @@ func (l *Log) Format() string {
 	if l.Msg != "" {
 		buf = append(buf, rgbterm.FgString(l.Msg, 255, 255, 255))
 	}
+	sort.Sort(l.Context)
 	for _, x := range l.Context {
 		buf = append(buf, rgbterm.FgString(x.Key, 0, 100, 90)+rgbterm.FgString("=", 190, 190, 190)+rgbterm.FgString(x.Value, 120, 120, 120))
 	}
