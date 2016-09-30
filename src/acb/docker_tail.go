@@ -142,8 +142,19 @@ func tailDockerLog(containerID string, ch chan<- logLine) {
 		if line[len(line)-1] == '\n' {
 			line = line[:len(line)-1]
 		}
+
 		//TODO figure out whats in the first 8 bytes
-		line = line[8:]
+		//double TODO, sometimes a line is truncated, then the next line contains less than 8 bytes before the timestamp
+		//so we will just remove all bytes until we find a '2' as in year '2004', this is terrible.
+		for {
+			if len(line) == 0 || line[0] == '2' {
+				break
+			}
+			line = line[1:]
+		}
+		if len(line) == 0 {
+			continue
+		}
 
 		x := strings.SplitN(line, " ", 2)
 
