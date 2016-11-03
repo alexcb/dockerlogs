@@ -2,9 +2,11 @@ package dockerlogs
 
 import (
 	"acb/logparsers/keyvalue"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/aybabtme/rgbterm"
@@ -82,6 +84,48 @@ func LogLevelToColorString(l LogLevel) string {
 	}
 }
 
+func formatValue(value interface{}) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case int:
+		return strconv.Itoa(v)
+	case int64:
+		return strconv.FormatInt(v, 10)
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64)
+	case []interface{}:
+		var buffer bytes.Buffer
+		buffer.WriteString("[")
+		for i, x := range v {
+			if i != 0 {
+				buffer.WriteString(" ")
+			}
+			buffer.WriteString(formatValue(x))
+		}
+		buffer.WriteString("]")
+		return buffer.String()
+	case map[interface{}]interface{}:
+		var buffer bytes.Buffer
+		buffer.WriteString("{")
+		first := true
+		for k, val := range v {
+			if first {
+				first = false
+			} else {
+				buffer.WriteString(" ")
+			}
+			buffer.WriteString(formatValue(k))
+			buffer.WriteString(":")
+			buffer.WriteString(formatValue(val))
+		}
+		buffer.WriteString("}")
+		return buffer.String()
+	default:
+		return fmt.Sprintf("%v", v)
+	}
+}
+
 func parseJsonLog(l string) *Log {
 	parsedLog := map[string]interface{}{}
 	err := json.Unmarshal([]byte(l), &parsedLog)
@@ -100,7 +144,7 @@ func parseJsonLog(l string) *Log {
 		case "time":
 			continue
 		default:
-			keyvalues = append(keyvalues, KeyValue{k, fmt.Sprintf("%v", v)})
+			keyvalues = append(keyvalues, KeyValue{k, formatValue(v)})
 		}
 	}
 	return &Log{
