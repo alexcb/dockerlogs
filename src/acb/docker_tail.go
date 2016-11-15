@@ -147,12 +147,16 @@ func tailDockerLog(containerID string, ch chan<- logLine) {
 		//double TODO, sometimes a line is truncated, then the next line contains less than 8 bytes before the timestamp
 		//so we will just remove all bytes until we find a '2' as in year '2004', this is terrible.
 		for {
-			if len(line) == 0 || line[0] == '2' {
+			if len(line) < 5 {
+				break
+			}
+
+			if line[0] == '2' && line[4] == '-' {
 				break
 			}
 			line = line[1:]
 		}
-		if len(line) == 0 {
+		if len(line) < 10 {
 			continue
 		}
 
