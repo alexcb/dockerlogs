@@ -1,9 +1,8 @@
 package main
 
 import (
-	"flag"
 	"fmt"
-	"strings"
+	"os"
 	"time"
 
 	"acb"
@@ -12,13 +11,7 @@ import (
 // curl --unix-socket /var/run/docker.sock 'http:/containers/1a210a4481b7/logs?stderr=1&stdout=1&timestamps=1&follow=1'
 
 func main() {
-
-	containerArg := flag.String("container", "", "container names, separated by commas")
-	flag.Parse()
-	names := strings.Split(*containerArg, ",")
-	if *containerArg == "" {
-		names = []string{}
-	}
+	names := os.Args[1:]
 
 	cli := dockerlogs.MustGetDockerCli()
 	lt := dockerlogs.NewLogTail(cli)
@@ -47,12 +40,14 @@ func main() {
 
 		timestamp := line.Timestamp.Format("2006-01-02T15:04:05")
 
-		parsedLog := dockerlogs.ParseLog(line.Line)
+		if line.Line != "" {
+			parsedLog := dockerlogs.ParseLog(line.Line)
 
-		fmt.Printf("%s %s %s\n",
-			dockerlogs.PadLeft(containerName, maxContainerNameLength),
-			timestamp,
-			parsedLog.Format())
+			fmt.Printf("%s %s %s\n",
+				dockerlogs.PadLeft(containerName, maxContainerNameLength),
+				timestamp,
+				parsedLog.Format())
+		}
 	}
 
 }

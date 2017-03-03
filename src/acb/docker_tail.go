@@ -169,7 +169,7 @@ func tailDockerLog(containerID string, ch chan<- logLine) {
 
 		ch <- logLine{
 			Timestamp: timestamp,
-			Line:      x[1],
+			Line:      strings.Trim(x[1], " \n\t\r"),
 		}
 	}
 }
